@@ -1,7 +1,7 @@
 colorcet
 matplotlib>=3.5.3
 numpy<2
-rliable @ file://../rliable
+rliable
 seaborn
 pandas
 Jinja2

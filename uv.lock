@@ -1128,14 +1128,14 @@ name = "envpool"
 version = "0.8.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "dm-env" },
-    { name = "gym" },
-    { name = "gymnasium" },
-    { name = "numpy" },
-    { name = "optree" },
-    { name = "packaging" },
-    { name = "types-protobuf" },
-    { name = "typing-extensions" },
+    { name = "dm-env", marker = "sys_platform == 'linux'" },
+    { name = "gym", marker = "sys_platform == 'linux'" },
+    { name = "gymnasium", marker = "sys_platform == 'linux'" },
+    { name = "numpy", marker = "sys_platform == 'linux'" },
+    { name = "optree", marker = "sys_platform == 'linux'" },
+    { name = "packaging", marker = "sys_platform == 'linux'" },
+    { name = "types-protobuf", marker = "sys_platform == 'linux'" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/60/c5857bff5d51f5591cda645943ce657dc17abb2b1e00e5de90c56acded65/envpool-0.8.4-cp310-cp310-manylinux_2_24_x86_64.whl", hash = "sha256:9c6a1af66c8a18d798b3069e8eee4cde2e5942af22b25d058189714f2630b024", size = 74882046, upload_time = "2023-10-30T20:11:10.031Z" },
@@ -1291,7 +1291,7 @@ wheels = [
 [[package]]
 name = "flashbax"
 version = "0.1.3"
-source = { directory = "../external/flashbax" }
+source = { directory = "external/flashbax" }
 dependencies = [
     { name = "chex" },
     { name = "flax" },
@@ -1550,9 +1550,9 @@ name = "gym"
 version = "0.26.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cloudpickle" },
-    { name = "gym-notices" },
-    { name = "numpy" },
+    { name = "cloudpickle", marker = "sys_platform == 'linux'" },
+    { name = "gym-notices", marker = "sys_platform == 'linux'" },
+    { name = "numpy", marker = "sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ab/b1/eb05a423eb801ab7d0715d6a3b28d92589e30b437052553df19ca2087240/gym-0.26.2.tar.gz", hash = "sha256:e0d882f4b54f0c65f203104c24ab8a38b039f1289986803c7d02cdbe214fbcc4", size = 721689, upload_time = "2022-10-04T23:57:43.247Z" }
 
@@ -1583,7 +1583,7 @@ wheels = [
 [[package]]
 name = "gymnax"
 version = "0.0.9"
-source = { virtual = "../external/gymnax" }
+source = { virtual = "external/gymnax" }
 dependencies = [
     { name = "flax" },
     { name = "gymnasium" },
@@ -1725,7 +1725,7 @@ wheels = [
 [[package]]
 name = "id-marl-eval"
 version = "0.0.4"
-source = { virtual = "../external/marl-eval" }
+source = { virtual = "external/marl-eval" }
 dependencies = [
     { name = "colorama" },
     { name = "colorcet" },
@@ -1761,7 +1761,7 @@ requires-dist = [
     { name = "pydocstyle", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==6.2.4" },
     { name = "pytest-xdist", marker = "extra == 'dev'" },
-    { name = "rliable", git = "https://github.com/google-research/rliable" },
+    { name = "rliable" },
     { name = "seaborn" },
     { name = "toml", marker = "extra == 'dev'" },
     { name = "tqdm" },
@@ -3801,7 +3801,7 @@ wheels = [
 
 [[package]]
 name = "optax"
-source = { directory = "../external/optax" }
+source = { directory = "external/optax" }
 dependencies = [
     { name = "absl-py" },
     { name = "jax" },
@@ -3838,7 +3838,7 @@ name = "optree"
 version = "0.19.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/63/7b078bc36d5a206c21b03565a818ede38ff0fbf014e92085ec467ef10adb/optree-0.19.0.tar.gz", hash = "sha256:bc1991a948590756409e76be4e29efd4a487a185056d35db6c67619c19ea27a1", size = 175199, upload_time = "2026-02-23T01:56:37.752Z" }
 wheels = [
@@ -4284,7 +4284,7 @@ wheels = [
 [[package]]
 name = "popgym-arcade"
 version = "0.0.6"
-source = { directory = "../external/popgym-arcade" }
+source = { directory = "external/popgym-arcade" }
 dependencies = [
     { name = "dm-pix" },
     { name = "jaxtyping", version = "0.3.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -4322,7 +4322,7 @@ provides-extras = ["human", "baselines", "tests", "all"]
 
 [[package]]
 name = "popjym"
-source = { directory = "../external/popjym" }
+source = { directory = "external/popjym" }
 dependencies = [
     { name = "flax" },
     { name = "gymnax" },
@@ -5229,7 +5229,7 @@ wheels = [
 [[package]]
 name = "rliable"
 version = "1.2.0"
-source = { git = "https://github.com/google-research/rliable#3ccd9f4dea577a04d3d2b557f259aac08badbd81" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "absl-py" },
     { name = "arch" },
@@ -5240,6 +5240,7 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "seaborn" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/ca/b9e0e274d4e53f39654ac02eac43cd707fd12273f69f12b220c00baba020/rliable-1.2.0.tar.gz", hash = "sha256:72789d9147d7c56e6efa812f9dffedcef44993a866ec08d75506ac7c1fe69cd5", size = 21175, upload_time = "2024-08-12T20:50:58.667Z" }
 
 [[package]]
 name = "rpds-py"
@@ -5776,7 +5777,7 @@ wheels = [
 
 [[package]]
 name = "stoa-env"
-source = { directory = "../external/Stoa" }
+source = { directory = "external/Stoa" }
 dependencies = [
     { name = "chex" },
     { name = "flax" },
@@ -5806,7 +5807,7 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'" },
     { name = "flax", specifier = ">=0.10.5" },
     { name = "gymnasium", marker = "extra == 'gymnax'", specifier = ">=1.1.1" },
-    { name = "gymnax", marker = "extra == 'gymnax'", virtual = "../external/gymnax" },
+    { name = "gymnax", marker = "extra == 'gymnax'", virtual = "external/gymnax" },
     { name = "importlib-metadata", marker = "extra == 'dev'" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "jax", specifier = ">=0.4.25" },
@@ -5843,7 +5844,7 @@ requires-dist = [
     { name = "stoa-env", extras = ["pgx"], marker = "extra == 'all'" },
     { name = "stoa-env", extras = ["xminigrid"], marker = "extra == 'all'" },
     { name = "testfixtures", marker = "extra == 'dev'" },
-    { name = "xminigrid", marker = "extra == 'xminigrid'", directory = "../external/xland-minigrid" },
+    { name = "xminigrid", marker = "extra == 'xminigrid'", directory = "external/xland-minigrid" },
 ]
 provides-extras = ["brax", "gymnax", "jumanji", "kinetix", "navix", "pgx", "xminigrid", "all", "dev"]
 
@@ -5926,13 +5927,13 @@ requires-dist = [
     { name = "craftax", specifier = ">=1.4.5" },
     { name = "distrax" },
     { name = "envpool", marker = "sys_platform == 'linux'", specifier = ">=0.8.4" },
-    { name = "flashbax", directory = "../external/flashbax" },
+    { name = "flashbax", directory = "external/flashbax" },
     { name = "flax", specifier = ">=0.10.5" },
     { name = "gymnasium", specifier = ">=1.1.1" },
-    { name = "gymnax", virtual = "../external/gymnax" },
+    { name = "gymnax", virtual = "external/gymnax" },
     { name = "huggingface-hub", specifier = ">=0.30.1" },
     { name = "hydra-core", specifier = ">=1.3.2" },
-    { name = "id-marl-eval", virtual = "../external/marl-eval" },
+    { name = "id-marl-eval", virtual = "external/marl-eval" },
     { name = "jax", specifier = ">=0.4.25,<0.6.0" },
     { name = "jaxlib", specifier = ">=0.5.3" },
     { name = "jumanji", specifier = ">=1.0.0" },
@@ -5942,20 +5943,20 @@ requires-dist = [
     { name = "neptune", specifier = ">=1.13.0" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "optax", directory = "../external/optax" },
+    { name = "optax", directory = "external/optax" },
     { name = "pgx", specifier = ">=2.6.0" },
     { name = "playground", specifier = ">=0.0.5" },
-    { name = "popgym-arcade", directory = "../external/popgym-arcade" },
-    { name = "popjym", directory = "../external/popjym" },
+    { name = "popgym-arcade", directory = "external/popgym-arcade" },
+    { name = "popjym", directory = "external/popjym" },
     { name = "protobuf", specifier = "==3.20.3" },
     { name = "protobuf", specifier = ">=3.20.2" },
     { name = "rlax", specifier = ">=0.1.6" },
-    { name = "stoa-env", extras = ["all"], directory = "../external/Stoa" },
+    { name = "stoa-env", extras = ["all"], directory = "external/Stoa" },
     { name = "tensorboard-logger", specifier = ">=0.1.0" },
     { name = "tensorflow-probability", specifier = ">=0.25.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "wandb", specifier = ">=0.19.8" },
-    { name = "xminigrid", directory = "../external/xland-minigrid" },
+    { name = "xminigrid", directory = "external/xland-minigrid" },
 ]
 
 [package.metadata.requires-dev]
@@ -6625,7 +6626,7 @@ wheels = [
 
 [[package]]
 name = "xminigrid"
-source = { directory = "../external/xland-minigrid" }
+source = { directory = "external/xland-minigrid" }
 dependencies = [
     { name = "chex" },
     { name = "flax" },
