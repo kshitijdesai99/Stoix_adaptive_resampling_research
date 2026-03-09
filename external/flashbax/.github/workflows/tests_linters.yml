@@ -1,0 +1,30 @@
+name: Tests and Linters 🧪
+
+on: [ push, pull_request ]
+
+jobs:
+  tests-and-linters:
+    name: "Python 3.9 on GitHub Hosted runner"
+    runs-on: ubuntu-latest
+    container:
+        image: python:3.9
+
+    steps:
+      - name: Install dependencies for viewer test
+        run: apt-get update && apt-get install -y xvfb
+      - name: Checkout flashbax
+        uses: actions/checkout@v3
+      - name: Install python dependencies 🔧
+        run: pip install .[dev]
+      - name: List python packages 📦
+        run: pip list
+      - name: Update git permissions
+        run: git config --global --add safe.directory /__w/flashbax/flashbax
+      - name: Run linters 🖌️
+        run: pre-commit run --all-files --verbose
+      - name: Run tests 🧪
+        run: pytest -n 2 --cov=flashbax --cov-report=term-missing --junit-xml=test-results.xml -vv flashbax
+      - name: Run coverage
+        run: |
+          coverage html --directory=coverage_html_report
+          coverage report --fail-under=0.97
