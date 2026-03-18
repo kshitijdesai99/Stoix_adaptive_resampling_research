@@ -356,6 +356,42 @@ def make_recurrent_fn(
     return recurrent_fn
 
 
+def _residual_resample(key: chex.PRNGKey, logits: chex.Array, n: int) -> chex.Array:
+    """Residual resampling: deterministic floor copies + multinomial residual draw.
+
+    Reference: Douc et al. (2005) - always has lower conditional variance than multinomial.
+
+    Args:
+        key: RNG key for the residual multinomial draw.
+        logits: Unnormalized log-weights for each of the m particles.
+        n: Number of particles to resample (output size).
+
+    Returns:
+        Integer indices of shape (n,) selecting resampled particles.
+    """
+    weights = jax.nn.softmax(logits, axis=-1)
+    m = weights.shape[0]
+    eps = jnp.finfo(weights.dtype).tiny
+
+    n_floor = jnp.floor(n * weights).astype(jnp.int32)          # deterministic counts
+    R = jnp.sum(n_floor)                                          # total deterministic slots
+    residual_w = n * weights - n_floor.astype(jnp.float32)       # unnormalized residuals
+    residual_w_norm = residual_w / (jnp.sum(residual_w) + eps)   # normalized for sampling
+
+    # Deterministic part: particle i fills slots [cumsum[i-1], cumsum[i])
+    positions = jnp.arange(n)
+    cumsum = jnp.cumsum(n_floor)
+    det_indices = jnp.clip(jnp.searchsorted(cumsum, positions, side="right"), 0, m - 1)
+
+    # Residual part: multinomial draw over normalized residual weights
+    res_indices = jax.random.categorical(
+        key, jnp.log(residual_w_norm + eps), shape=(n,)
+    )
+
+    # Positions < R use deterministic assignment; the rest use residual draw
+    return jnp.where(positions < R, det_indices, res_indices)
+
+
 class Particles(NamedTuple):
     """Container for particle states used in Sequential Monte Carlo (SMC) search.
 
@@ -836,13 +872,25 @@ class SPO:
 
         # Generate separate keys for each batch dimension
         batch_dim_keys = jax.random.split(key_resample, resample_logits.shape[0])
-        # Sample indices for resampling using categorical distribution based on logits
-        particle_selection_idxs = jax.vmap(jax.random.categorical, in_axes=(0, 0, None, None))(
-            batch_dim_keys,
-            resample_logits,
-            -1,
-            (self.config.system.num_particles,),
-        )
+        n = self.config.system.num_particles
+
+        if self.config.system.resampling.get("use_residual", False):
+            # Residual resampling: lower conditional variance than multinomial (Douc et al. 2005)
+            particle_selection_idxs = jax.vmap(_residual_resample, in_axes=(0, 0, None))(
+                batch_dim_keys,
+                resample_logits,
+                n,
+            )
+        else:
+            # Default: multinomial resampling via categorical
+            particle_selection_idxs = jax.vmap(
+                jax.random.categorical, in_axes=(0, 0, None, None)
+            )(
+                batch_dim_keys,
+                resample_logits,
+                -1,
+                (n,),
+            )
 
         def get_particles(
             selection_idxs: chex.Array,
