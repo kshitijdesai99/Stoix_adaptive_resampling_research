@@ -34,6 +34,7 @@ resampling:
   mode: period # Resampling method: 'period' or 'ess' (effective sample size)
   period: 4 # If using period mode this is the frequency of resampling
   ess_threshold: 0.5 # If using ess mode this is the threshold for resampling
+  use_residual: false # If true, use residual resampling instead of multinomial (Douc et al. 2005)
 temperature:
   adaptive: True # Whether to use adaptive temperature for search
   fixed_temperature: 0.5 # Fixed temperature value if adaptive is False
