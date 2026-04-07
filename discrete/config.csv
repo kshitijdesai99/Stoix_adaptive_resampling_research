@@ -1,0 +1,16 @@
+exp_id,env,total_num_envs,total_timesteps,num_particles,search_depth,resampling_mode,ess_threshold,period,use_residual,total_batch_size,rollout_length,actor_lr,critic_lr,gamma,gae_lambda,timestep
+1,xland_minigrid/empty_5x5,128,3000000,16,8,period,,2,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+2,xland_minigrid/empty_5x5,128,3000000,16,8,ess,0.5,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+3,xland_minigrid/door_key_5x5,128,3000000,16,8,ess,0.5,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+4,xland_minigrid/door_key_5x5,128,3000000,16,8,period,,2,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+5,xland_minigrid/door_key_8x8,128,3000000,16,8,ess,0.5,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+6,xland_minigrid/door_key_8x8,128,3000000,16,8,period,,2,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+7,xland_minigrid/door_key_16x16,128,3000000,16,8,ess,0.5,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+8,xland_minigrid/door_key_8x8,128,3000000,4,8,ess,0.5,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+9,xland_minigrid/door_key_8x8,128,3000000,4,8,period,,2,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+10,xland_minigrid/door_key_8x8,128,3000000,4,8,ess,0.8,,false,64,32,0.0003,0.0003,0.99,0.95,2949120
+11,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.5,,false,64,128,0.0003,0.0003,0.99,0.95,4997120
+12,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.5,,true,64,128,0.0003,0.0003,0.99,0.95,4997120
+13,xland_minigrid/door_key_16x16,32,5000000,16,64,period,,4,false,64,128,0.0003,0.0003,0.99,0.95,4997120
+14,xland_minigrid/door_key_16x16,32,5000000,16,64,period,,4,true,64,128,0.0003,0.0003,0.99,0.95,4997120
+15,xland_minigrid/door_key_16x16,32,5000000,32,64,period,,4,true,64,128,0.0003,0.0003,0.99,0.95,4997120
