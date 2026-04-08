@@ -4,6 +4,7 @@ import json
 
 INPUT             = "continous/continous-exp.txt"
 OUTPUT_CONFIG     = "continous/config.csv"
+OUTPUT_ABSOLUTE   = "continous/absolute.csv"
 OUTPUT_EVALUATOR  = "continous/evaluator.csv"
 OUTPUT_ACTOR      = "continous/actor.csv"
 OUTPUT_TRAINER    = "continous/trainer.csv"
@@ -92,6 +93,7 @@ KEY_MAP = {
 }
 
 rows = []
+abs_rows = []
 eval_rows = []
 actor_rows = []
 trainer_rows = []
@@ -120,6 +122,16 @@ with open(INPUT) as f:
             if m2:
                 current_row["timestep"] = int(m2.group(1))
                 current_row = None
+
+        if current_exp_id is not None and line.startswith("ABSOLUTE - "):
+            abs_row = {col: "" for col in ABS_COLUMNS}
+            abs_row["exp_id"] = current_exp_id
+            for field in line[len("ABSOLUTE - "):].split(" | "):
+                if ": " in field:
+                    k, v = field.split(": ", 1)
+                    if k.strip() in ABS_KEY_MAP:
+                        abs_row[ABS_KEY_MAP[k.strip()]] = v.strip()
+            abs_rows.append(abs_row)
 
         if current_exp_id is not None and line.startswith("EVALUATOR - "):
             eval_row = {col: "" for col in ABS_COLUMNS}
@@ -167,6 +179,11 @@ with open(OUTPUT_CONFIG, "w", newline="") as f:
     writer.writeheader()
     writer.writerows(rows)
 
+with open(OUTPUT_ABSOLUTE, "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=ABS_COLUMNS)
+    writer.writeheader()
+    writer.writerows(abs_rows)
+
 with open(OUTPUT_EVALUATOR, "w", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=ABS_COLUMNS)
     writer.writeheader()
@@ -183,6 +200,7 @@ with open(OUTPUT_TRAINER, "w", newline="") as f:
     writer.writerows(trainer_rows)
 
 print(f"Written {len(rows)} rows to {OUTPUT_CONFIG}")
+print(f"Written {len(abs_rows)} rows to {OUTPUT_ABSOLUTE}")
 print(f"Written {len(eval_rows)} rows to {OUTPUT_EVALUATOR}")
 print(f"Written {len(actor_rows)} rows to {OUTPUT_ACTOR}")
 print(f"Written {len(trainer_rows)} rows to {OUTPUT_TRAINER}")
