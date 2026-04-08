@@ -10,3 +10,4 @@ exp_id,env,total_num_envs,total_timesteps,num_particles,search_depth,resampling_
 9,brax/halfcheetah,128,3000000,160,32,ess,0.5,,true,64,32,0.0003,0.0003,0.99,0.95,1179648
 10,brax/halfcheetah,128,3000000,160,32,ess,0.7,,true,64,32,0.0003,0.0003,0.99,0.95,1179648
 11,brax/halfcheetah,128,3000000,160,32,ess,0.3,,true,64,32,0.0003,0.0003,0.99,0.95,1179648
+12,brax/halfcheetah,128,3000000,160,32,period,,33,true,64,32,0.0003,0.0003,0.99,0.95,1179648

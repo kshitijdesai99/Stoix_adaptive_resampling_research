@@ -15,7 +15,7 @@ exp_id,env,total_num_envs,total_timesteps,num_particles,search_depth,resampling_
 14,xland_minigrid/door_key_16x16,32,5000000,16,64,period,,4,true,64,128,0.0003,0.0003,0.99,0.95,4997120
 15,xland_minigrid/door_key_16x16,32,5000000,32,64,period,,4,true,64,128,0.0003,0.0003,0.99,0.95,4997120
 16,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.3,,true,64,128,0.0003,0.0003,0.99,0.95,4997120
-17,xland_minigrid/door_key_16x16,32,5000000,16,64,period,,64,true,64,128,0.0003,0.0003,0.99,0.95,4997120
+17,xland_minigrid/door_key_16x16,32,5000000,16,64,period,,65,true,64,128,0.0003,0.0003,0.99,0.95,4997120
 18,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.3,,false,64,128,0.0003,0.0003,0.99,0.95,4997120
 19,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.7,,false,64,128,0.0003,0.0003,0.99,0.95,4997120
 20,xland_minigrid/door_key_16x16,32,5000000,16,64,ess,0.7,,true,64,128,0.0003,0.0003,0.99,0.95,4997120
