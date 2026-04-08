@@ -49,7 +49,7 @@ version = _metadata.__version__  # type: ignore
 
 def _parse_requirements(path: str) -> List[str]:
     """Returns content of given requirements file."""
-    with open(os.path.join(path)) as f:
+    with open(os.path.join(path), encoding="utf-8") as f:
         return [
             line.rstrip() for line in f if not (line.isspace() or line.startswith("#"))
         ]
@@ -59,7 +59,7 @@ setup(
     name="id-marl-eval",
     version=version,
     description="A Python library for Multi-Agent Reinforcement Learning evaluation.",
-    long_description=open(os.path.join(_CURRENT_DIR, "README.md")).read(),
+    long_description=open(os.path.join(_CURRENT_DIR, "README.md"), encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="InstaDeep Ltd",
     license="Apache License, Version 2.0",
