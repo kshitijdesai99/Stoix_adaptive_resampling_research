@@ -219,8 +219,13 @@ def main(config: DictConfig) -> None:
     pipeline_states_np = [_to_np(s) for s in pipeline_states]
 
     print(f"Rendering {len(pipeline_states_np)} frames with mujoco...", flush=True)
+    # MuJoCo's default offscreen framebuffer is 640x480 - resize it to match.
+    sys = raw_env.sys
+    if hasattr(sys, "mj_model"):
+        sys.mj_model.vis.global_.offwidth = max(width, sys.mj_model.vis.global_.offwidth)
+        sys.mj_model.vis.global_.offheight = max(height, sys.mj_model.vis.global_.offheight)
     frames = brax_image.render_array(
-        raw_env.sys, pipeline_states_np, height=height, width=width
+        sys, pipeline_states_np, height=height, width=width
     )
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
