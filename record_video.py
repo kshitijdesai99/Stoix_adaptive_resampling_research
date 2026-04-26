@@ -107,9 +107,12 @@ def main(config: DictConfig) -> None:
             action = pi.sample(seed=k)
         return action[0]
 
+    def _xmg_state(s):
+        return getattr(s, "unwrapped_state", s)
+
     # Roll out one episode and render each step.
     env_state, timestep = eval_env.reset(reset_key)
-    frames = [raw_env.render(raw_params, env_state.unwrapped_state)]
+    frames = [raw_env.render(raw_params, _xmg_state(env_state))]
     total_reward = 0.0
     for step in range(max_steps):
         if bool(timestep.last()):
@@ -117,7 +120,7 @@ def main(config: DictConfig) -> None:
         act_key, sub = jax.random.split(act_key)
         action = policy_step(online_actor_params, timestep.observation, sub)
         env_state, timestep = eval_env.step(env_state, action)
-        frames.append(raw_env.render(raw_params, env_state.unwrapped_state))
+        frames.append(raw_env.render(raw_params, _xmg_state(env_state)))
         total_reward += float(timestep.reward)
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
