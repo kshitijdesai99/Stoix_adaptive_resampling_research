@@ -145,36 +145,64 @@ def main(config: DictConfig) -> None:
     def _xmg_state(s):
         return getattr(s, "unwrapped_state", s)
 
-    import sys
     import time as _time
 
-    # Roll out one episode and render each step.
+    # Fast on-device rollout using scan: run all steps in one compiled call,
+    # then render frames on the host afterwards.
+    def scan_step(carry, _):
+        env_state_, timestep_, key_ = carry
+        key_, sub_ = jax.random.split(key_)
+        action_ = select_action(timestep_.observation, env_state_, sub_)
+        new_env_state, new_timestep = eval_env.step(env_state_, action_)
+        return (new_env_state, new_timestep, key_), (
+            new_env_state,
+            new_timestep.reward,
+            new_timestep.last(),
+        )
+
+    @jax.jit
+    def run_rollout(init_env_state, init_timestep, init_key):
+        _, (states, rewards, dones) = jax.lax.scan(
+            scan_step,
+            (init_env_state, init_timestep, init_key),
+            None,
+            length=max_steps,
+        )
+        return states, rewards, dones
+
     print("Resetting env...", flush=True)
     env_state, timestep = eval_env.reset(reset_key)
-    print("Rendering first frame...", flush=True)
-    frames = [raw_env.render(raw_params, _xmg_state(env_state))]
-    print(f"First frame ok, shape={getattr(frames[0], 'shape', None)}", flush=True)
-    total_reward = 0.0
+    print("Compiling on-device rollout (first call may take a few minutes)...", flush=True)
     t0 = _time.time()
-    for step in range(max_steps):
-        if step == 0:
-            print("Compiling policy_step (first call may take a while)...", flush=True)
-        if bool(timestep.last()):
-            print(f"Episode terminated at step {step}", flush=True)
-            break
-        act_key, sub = jax.random.split(act_key)
-        action = select_action(timestep.observation, env_state, sub)
-        env_state, timestep = eval_env.step(env_state, action)
-        frames.append(raw_env.render(raw_params, _xmg_state(env_state)))
-        total_reward += float(timestep.reward)
-        if step == 0 or (step + 1) % 25 == 0:
-            elapsed = _time.time() - t0
-            print(
-                f"  step {step + 1}/{max_steps} | elapsed {elapsed:.1f}s | "
-                f"return {total_reward:.3f}",
-                flush=True,
-            )
-            sys.stdout.flush()
+    states, rewards, dones = run_rollout(env_state, timestep, act_key)
+    jax.block_until_ready(rewards)
+    print(f"Rollout done in {_time.time() - t0:.1f}s. Rendering frames...", flush=True)
+
+    # Find the first terminal step (if any) so we don't render past episode end.
+    rewards_np = jax.device_get(rewards)
+    dones_np = jax.device_get(dones)
+    end_idx = int(dones_np.argmax()) if bool(dones_np.any()) else int(max_steps - 1)
+    n_frames = end_idx + 1
+    total_reward = float(rewards_np[: n_frames].sum())
+    print(
+        f"Episode length: {n_frames} | terminated: {bool(dones_np.any())} | "
+        f"return: {total_reward:.3f}",
+        flush=True,
+    )
+
+    # Bring all needed states to host once.
+    states_host = jax.device_get(states)
+
+    def _index_state(s, i):
+        return jax.tree_util.tree_map(lambda x: x[i], s)
+
+    frames = [raw_env.render(raw_params, _xmg_state(env_state))]
+    for i in range(n_frames):
+        frames.append(
+            raw_env.render(raw_params, _xmg_state(_index_state(states_host, i)))
+        )
+        if (i + 1) % 50 == 0:
+            print(f"  rendered {i + 1}/{n_frames} frames", flush=True)
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
     imageio.mimsave(output, frames, fps=fps)
