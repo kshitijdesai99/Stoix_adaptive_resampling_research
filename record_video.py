@@ -19,7 +19,6 @@ import hydra
 import imageio
 import jax
 import jax.numpy as jnp
-import xminigrid
 from omegaconf import DictConfig, OmegaConf
 
 from stoix.base_types import OnlineAndTarget
@@ -56,8 +55,51 @@ def main(config: DictConfig) -> None:
     # Build envs (eval_env has the same observation pipeline used by the policy).
     _, eval_env = environments.make(config=config)
 
-    # Build a raw xminigrid env purely for RGB rendering.
-    raw_env, raw_params = xminigrid.make(config.env.scenario.name, **config.env.kwargs)
+    # Build a raw env purely for RGB rendering.
+    env_suite = config.env.env_name
+    if env_suite == "xland_minigrid":
+        import xminigrid
+
+        raw_env, raw_params = xminigrid.make(
+            config.env.scenario.name, **config.env.kwargs
+        )
+
+        def render_frames(init_env_state, states_host, n_frames):
+            frames_ = [raw_env.render(raw_params, _xmg_state(init_env_state))]
+            for j in range(n_frames):
+                frames_.append(
+                    raw_env.render(raw_params, _xmg_state(_index_state(states_host, j)))
+                )
+            return frames_
+
+        def write_video(frames_, output_):
+            os.makedirs(os.path.dirname(output_) or ".", exist_ok=True)
+            imageio.mimsave(output_, frames_, fps=fps)
+    elif env_suite == "jumanji":
+        import copy as _copy
+
+        import jumanji
+
+        env_kwargs = dict(_copy.deepcopy(config.env.kwargs))
+        if "generator" in env_kwargs:
+            generator = env_kwargs.pop("generator")
+            generator = hydra.utils.instantiate(generator)
+            env_kwargs["generator"] = generator
+        raw_env = jumanji.make(config.env.scenario.name, **env_kwargs)
+
+        def render_frames(init_env_state, states_host, n_frames):
+            states_list = [init_env_state]
+            for j in range(n_frames):
+                states_list.append(_index_state(states_host, j))
+            return states_list
+
+        def write_video(states_list, output_):
+            os.makedirs(os.path.dirname(output_) or ".", exist_ok=True)
+            raw_env.animate(states_list, interval=int(1000 / max(fps, 1)), save_path=output_)
+    else:
+        raise NotImplementedError(
+            f"record_video.py does not yet support env suite '{env_suite}'."
+        )
 
     # Instantiate networks (actor used for the rollout; critic only needed to match
     # the SPOParams pytree structure when restoring a checkpoint).
@@ -145,6 +187,9 @@ def main(config: DictConfig) -> None:
     def _xmg_state(s):
         return getattr(s, "unwrapped_state", s)
 
+    def _index_state(s, i):
+        return jax.tree_util.tree_map(lambda x: x[i], s)
+
     import time as _time
 
     # Fast on-device rollout using scan: run all steps in one compiled call,
@@ -193,20 +238,11 @@ def main(config: DictConfig) -> None:
     # Bring all needed states to host once.
     states_host = jax.device_get(states)
 
-    def _index_state(s, i):
-        return jax.tree_util.tree_map(lambda x: x[i], s)
-
-    frames = [raw_env.render(raw_params, _xmg_state(env_state))]
-    for i in range(n_frames):
-        frames.append(
-            raw_env.render(raw_params, _xmg_state(_index_state(states_host, i)))
-        )
-        if (i + 1) % 50 == 0:
-            print(f"  rendered {i + 1}/{n_frames} frames", flush=True)
-
-    os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
-    imageio.mimsave(output, frames, fps=fps)
-    print(f"Saved {len(frames)} frames -> {output} | episode_return={total_reward:.3f}")
+    frames = render_frames(env_state, states_host, n_frames)
+    write_video(frames, output)
+    print(
+        f"Saved {n_frames + 1} frames -> {output} | episode_return={total_reward:.3f}"
+    )
 
 
 if __name__ == "__main__":
