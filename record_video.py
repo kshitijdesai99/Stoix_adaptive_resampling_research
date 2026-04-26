@@ -26,6 +26,7 @@ from stoix.base_types import OnlineAndTarget
 from stoix.networks.base import FeedForwardActor as Actor
 from stoix.networks.base import FeedForwardCritic as Critic
 from stoix.systems.mpo.mpo_types import CategoricalDualParams
+from stoix.systems.spo.ff_spo import SPO, make_recurrent_fn, make_root_fn
 from stoix.systems.spo.spo_types import SPOParams
 from stoix.utils import make_env as environments
 from stoix.utils.checkpointing import Checkpointer
@@ -46,6 +47,11 @@ def main(config: DictConfig) -> None:
     fps = int(video_cfg.get("fps", 10))
     seed = int(video_cfg.get("seed", 0))
     greedy = bool(video_cfg.get("greedy", True))
+    # Use SMC search (matches the evaluator used during training) when loading a
+    # trained checkpoint. The actor alone is often not competent without search.
+    use_search = bool(
+        video_cfg.get("use_search", config.logger.checkpointing.load_model)
+    )
 
     # Build envs (eval_env has the same observation pipeline used by the policy).
     _, eval_env = environments.make(config=config)
@@ -99,13 +105,42 @@ def main(config: DictConfig) -> None:
     online_actor_params = params.actor_params.online
 
     @jax.jit
-    def policy_step(actor_params_, obs, k):
+    def actor_only_step(actor_params_, obs, k):
         pi = actor_network.apply(actor_params_, obs[None, ...])
         if greedy:
             action = pi.mode()
         else:
             action = pi.sample(seed=k)
         return action[0]
+
+    # Build SMC search (same as training evaluator).
+    if use_search:
+        print("Building SMC search (this matches training-time evaluation)...", flush=True)
+        root_fn = make_root_fn(actor_network.apply, critic_network.apply, config)
+        model_recurrent_fn = make_recurrent_fn(
+            jax.vmap(eval_env.step),
+            actor_network.apply,
+            critic_network.apply,
+            config,
+        )
+        search_method = SPO(config, recurrent_fn=model_recurrent_fn)
+        search_apply_fn = search_method.search
+
+        @jax.jit
+        def search_step(params_, obs, env_state_, k):
+            root_key, policy_key = jax.random.split(k)
+            obs_b, state_b = jax.tree_util.tree_map(
+                lambda x: x[jnp.newaxis, ...], (obs, env_state_)
+            )
+            root = root_fn(params_, obs_b, state_b, root_key)
+            search_output = search_apply_fn(params_, policy_key, root)
+            return search_output.action[0]
+
+        def select_action(obs, env_state_, k):
+            return search_step(params, obs, env_state_, k)
+    else:
+        def select_action(obs, env_state_, k):
+            return actor_only_step(online_actor_params, obs, k)
 
     def _xmg_state(s):
         return getattr(s, "unwrapped_state", s)
@@ -128,7 +163,7 @@ def main(config: DictConfig) -> None:
             print(f"Episode terminated at step {step}", flush=True)
             break
         act_key, sub = jax.random.split(act_key)
-        action = policy_step(online_actor_params, timestep.observation, sub)
+        action = select_action(timestep.observation, env_state, sub)
         env_state, timestep = eval_env.step(env_state, action)
         frames.append(raw_env.render(raw_params, _xmg_state(env_state)))
         total_reward += float(timestep.reward)
