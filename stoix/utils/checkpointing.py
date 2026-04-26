@@ -1,19 +1,15 @@
 import os
-import warnings
+import pickle
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, Type
 
-import absl.logging as absl_logging
-import orbax.checkpoint
+import jax
+import numpy as np
 from chex import Numeric
-from jax import tree
 from omegaconf import DictConfig, OmegaConf
 
 from stoix.base_types import StoixState
 
-# Keep track of the version of the checkpointer
-# Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
-# whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
 CHECKPOINTER_VERSION = 2.0
 
 
@@ -50,51 +46,28 @@ class Checkpointer:
                 checkpoint_step % keep_period == 0. Defaults to None.
 
         """
-        # When we load an existing checkpoint, the sharding info is read from the checkpoint file,
-        # rather than from 'RestoreArgs'. This is desired behaviour, so we suppress the warning.
-        warnings.filterwarnings(
-            action="ignore",
-            category=UserWarning,
-            message="Couldn't find sharding info under RestoreArgs",
-        )
-
-        orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
         checkpoint_str = (
             checkpoint_uid if checkpoint_uid else datetime.now().strftime("%Y%m%d%H%M%S")
         )
+        if os.path.isabs(rel_dir):
+            self._directory = os.path.join(rel_dir, model_name, checkpoint_str)
+        else:
+            self._directory = os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str)
+        os.makedirs(self._directory, exist_ok=True)
 
-        options = orbax.checkpoint.CheckpointManagerOptions(
-            create=True,
-            best_fn=lambda x: x["episode_return"],
-            best_mode="max",
-            save_interval_steps=save_interval_steps,
-            max_to_keep=max_to_keep,
-            keep_period=keep_period,
-        )
-
-        def get_json_ready(obj: Any) -> Any:
-            if not isinstance(obj, (bool, str, int, float, type(None))):
-                return str(obj)
-            else:
-                return obj
-
-        # Convert metadata to JSON-ready format
         if metadata is not None and isinstance(metadata, DictConfig):
             metadata = OmegaConf.to_container(metadata, resolve=True)
-        metadata_json_ready = tree.map(get_json_ready, metadata)
+        self._metadata = {
+            "checkpointer_version": CHECKPOINTER_VERSION,
+            **(metadata if isinstance(metadata, dict) else {}),
+        }
 
-        self._manager = orbax.checkpoint.CheckpointManager(
-            directory=os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str),
-            checkpointers=orbax_checkpointer,
-            options=options,
-            metadata={
-                "checkpointer_version": CHECKPOINTER_VERSION,
-                **(metadata_json_ready if metadata_json_ready is not None else {}),
-            },
-        )
-
-        # Don't log checkpointing messages (at INFO level)
-        absl_logging.set_verbosity(absl_logging.WARNING)
+        self._max_to_keep = max_to_keep
+        self._save_interval_steps = save_interval_steps
+        self._keep_period = keep_period
+        self._best_metric: Optional[float] = None
+        self._best_step: Optional[int] = None
+        self._last_save_step: Optional[int] = None
 
     def save(
         self,
@@ -116,15 +89,34 @@ class Checkpointer:
         Returns:
             bool: whether the saving was successful.
         """
-        model_save_success: bool = self._manager.save(
-            step=timestep,
-            items={
-                "learner_state": unreplicated_learner_state,
-            },
-            # TODO: Log other metrics if needed.
-            metrics={"episode_return": float(episode_return)},
-        )
-        return model_save_success
+        if (
+            self._last_save_step is not None
+            and (timestep - self._last_save_step) < self._save_interval_steps
+        ):
+            return False
+
+        episode_return_f = float(episode_return)
+        # Always save "latest" so restore works even if no metric improvement.
+        latest_path = os.path.join(self._directory, "latest.pkl")
+        payload = {
+            "step": int(timestep),
+            "episode_return": episode_return_f,
+            "metadata": self._metadata,
+            "learner_state": _to_numpy_pytree(unreplicated_learner_state),
+        }
+        with open(latest_path, "wb") as f:
+            pickle.dump(payload, f)
+
+        # Track best by episode_return (max).
+        if self._best_metric is None or episode_return_f > self._best_metric:
+            self._best_metric = episode_return_f
+            self._best_step = int(timestep)
+            best_path = os.path.join(self._directory, "best.pkl")
+            with open(best_path, "wb") as f:
+                pickle.dump(payload, f)
+
+        self._last_save_step = int(timestep)
+        return True
 
     def restore_params(
         self,
@@ -150,38 +142,60 @@ class Checkpointer:
             Tuple[ActorCriticParams,Union[HiddenState, None]]: the restored params and
             hidden states.
         """
-        # We want to ensure `major` versions match, but allow `minor` versions to differ
-        # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
-        # Any breaking API changes should be reflected in the major version
-        assert (self._manager.metadata()["checkpointer_version"] // 1) == (
+        # Prefer best.pkl, fall back to latest.pkl.
+        best_path = os.path.join(self._directory, "best.pkl")
+        latest_path = os.path.join(self._directory, "latest.pkl")
+        path = best_path if os.path.exists(best_path) else latest_path
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"No checkpoint found in {self._directory}")
+
+        with open(path, "rb") as f:
+            payload = pickle.load(f)
+
+        assert (payload["metadata"]["checkpointer_version"] // 1) == (
             CHECKPOINTER_VERSION // 1
         ), "Loaded checkpoint was created with a different major version of the checkpointer."
 
-        # Restore the checkpoint, either the n-th (if specified) or just the latest
-        restored_checkpoint = self._manager.restore(
-            timestep if timestep else self._manager.latest_step()
-        )
+        restored_learner_state = _to_jax_pytree(payload["learner_state"])
 
-        # Dictionary of the restored learner state
-        restored_learner_state_raw = restored_checkpoint["learner_state"]
+        # Support both dataclass/NamedTuple attribute access and dict-style access.
+        def _get(obj: Any, key: str) -> Any:
+            if hasattr(obj, key):
+                return getattr(obj, key)
+            return obj[key]
 
-        # The type of params to restore is the same type as the `input_params`
+        raw_params = _get(restored_learner_state, "params")
         TParams = type(input_params)  # noqa: N806
+        if isinstance(raw_params, TParams):
+            restored_params = raw_params
+        elif isinstance(raw_params, dict):
+            restored_params = TParams(**raw_params)
+        else:
+            # NamedTuple or similar with the same fields.
+            restored_params = TParams(*tuple(raw_params))
 
-        # We no longer check if params are in a FrozenDict since we require Flax >= 0.8.1
-        restored_params = TParams(**restored_learner_state_raw["params"])
-
-        # Restore hidden states if required
         restored_hstates = None
         if restore_hstates and THiddenState is not None:
-            restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
+            raw_h = _get(restored_learner_state, "hstates")
+            if isinstance(raw_h, THiddenState):
+                restored_hstates = raw_h
+            elif isinstance(raw_h, dict):
+                restored_hstates = THiddenState(**raw_h)
+            else:
+                restored_hstates = THiddenState(*tuple(raw_h))
 
         return restored_params, restored_hstates
 
     def get_cfg(self) -> DictConfig:
-        """Return the metadata of the checkpoint.
+        """Return the metadata of the checkpoint."""
+        return DictConfig(self._metadata)
 
-        Returns:
-            DictConfig: metadata of the checkpoint.
-        """
-        return DictConfig(self._manager.metadata())
+
+def _to_numpy_pytree(tree_in: Any) -> Any:
+    return jax.tree_util.tree_map(lambda x: np.asarray(x), tree_in)
+
+
+def _to_jax_pytree(tree_in: Any) -> Any:
+    import jax.numpy as jnp
+
+    return jax.tree_util.tree_map(lambda x: jnp.asarray(x), tree_in)
