@@ -110,18 +110,36 @@ def main(config: DictConfig) -> None:
     def _xmg_state(s):
         return getattr(s, "unwrapped_state", s)
 
+    import sys
+    import time as _time
+
     # Roll out one episode and render each step.
+    print("Resetting env...", flush=True)
     env_state, timestep = eval_env.reset(reset_key)
+    print("Rendering first frame...", flush=True)
     frames = [raw_env.render(raw_params, _xmg_state(env_state))]
+    print(f"First frame ok, shape={getattr(frames[0], 'shape', None)}", flush=True)
     total_reward = 0.0
+    t0 = _time.time()
     for step in range(max_steps):
+        if step == 0:
+            print("Compiling policy_step (first call may take a while)...", flush=True)
         if bool(timestep.last()):
+            print(f"Episode terminated at step {step}", flush=True)
             break
         act_key, sub = jax.random.split(act_key)
         action = policy_step(online_actor_params, timestep.observation, sub)
         env_state, timestep = eval_env.step(env_state, action)
         frames.append(raw_env.render(raw_params, _xmg_state(env_state)))
         total_reward += float(timestep.reward)
+        if step == 0 or (step + 1) % 25 == 0:
+            elapsed = _time.time() - t0
+            print(
+                f"  step {step + 1}/{max_steps} | elapsed {elapsed:.1f}s | "
+                f"return {total_reward:.3f}",
+                flush=True,
+            )
+            sys.stdout.flush()
 
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
     imageio.mimsave(output, frames, fps=fps)
