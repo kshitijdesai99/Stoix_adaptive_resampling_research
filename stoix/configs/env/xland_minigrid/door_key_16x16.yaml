@@ -1,0 +1,12 @@
+# ---Environment Configs---
+env_name: xland_minigrid
+scenario:
+  name: MiniGrid-DoorKey-16x16
+  task_name: minigrid_doorkey_16x16
+
+kwargs: {}
+
+eval_metric: episode_return
+
+wrapper:
+  _target_: stoa.FlattenObservationWrapper
